@@ -1,0 +1,26 @@
+[
+  {
+    "text": "INCIDENT REPORT #402 - THE ART DECO MUSEUM\nDate: October 12, 2023\nLocation: Vault Room 4\nItem Missing: The 'Blue Star' Diamond.\nSummary: At approximately 11:45 PM, the pressure sensors on the main pedestal were deactivated. No alarm sounded in the main hall. Forensic evidence suggests a specialized bypass tool was used, one that only high-level security staff should have access to.",
+    "source": "incident_report.txt",
+    "page": 1,
+    "chunk_index": 0
+  },
+  {
+    "text": "PROJECT ALPHA SUMMARY\nObjective: To migrate the legacy database to the new encrypted server cluster.\nRequirements: Requires simultaneous authorization from the Project Lead and the Lead Developer.\nCompletion Deadline: November 20, 2023.",
+    "source": "project_overview.txt",
+    "page": 1,
+    "chunk_index": 0
+  },
+  {
+    "text": "SYSTEM MIGRATION LOGS - SERVER CLUSTER B\nDate: November 15, 2023\n09:00 AM - Migration Initiated by ID: 5521.\n10:30 AM - Data packet transfer status: 45% complete.\n11:15 AM - Level Beta authorization required for security handshake.\n11:20 AM - ID: 4409 verified. Handshake successful.\n01:00 PM - Migration Completed. Total data moved: 1.2 Terabytes.",
+    "source": "server_logs.txt",
+    "page": 1,
+    "chunk_index": 0
+  },
+  {
+    "text": "PROJECT ALPHA - PERSONNEL DIRECTORY\nProject Lead: Dr. Aris Thorne (ID: 5521) - Access Level: Alpha\nLead Developer: Elena Rodriguez (ID: 4409) - Access Level: Beta\nLogistics: Marcus Chen (ID: 3312) - Access Level: Gamma\nNote: All Level Alpha personnel are required to oversee system migrations scheduled for Q4.",
+    "source": "staff_directory.txt",
+    "page": 1,
+    "chunk_index": 0
+  }
+]

@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Chatbot — Project Guide</title>
+<style>
+  :root {
+    --brand-blue: #1a73e8;
+    --brand-dark: #202124;
+    --brand-grey: #5f6368;
+    --brand-light: #f8f9fa;
+    --brand-alt: #e8f0fe;
+    --brand-green: #34a853;
+    --brand-orange: #ea8600;
+    --brand-red: #d93025;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: var(--brand-dark);
+    background: #fff;
+    line-height: 1.65;
+    padding: 0;
+  }
+  /* Header */
+  header {
+    background: var(--brand-blue);
+    color: #fff;
+    padding: 36px 40px 28px;
+  }
+  header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 6px; }
+  header p  { font-size: 1rem; opacity: 0.9; }
+  /* Nav */
+  nav {
+    background: var(--brand-light);
+    border-bottom: 1px solid #dadce0;
+    padding: 10px 40px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  nav a {
+    color: var(--brand-blue);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-right: 22px;
+  }
+  nav a:hover { text-decoration: underline; }
+  /* Main */
+  main { max-width: 960px; margin: 0 auto; padding: 32px 24px 80px; }
+  section { margin-bottom: 48px; }
+  h2 {
+    color: var(--brand-blue);
+    font-size: 1.5rem;
+    border-bottom: 2px solid var(--brand-blue);
+    padding-bottom: 6px;
+    margin-bottom: 16px;
+  }
+  h3 { color: var(--brand-dark); font-size: 1.15rem; margin: 20px 0 8px; }
+  h4 { color: var(--brand-grey); font-size: 1rem; margin: 14px 0 6px; }
+  p, li { font-size: 0.95rem; }
+  p  { margin-bottom: 10px; }
+  ul, ol { padding-left: 24px; margin-bottom: 12px; }
+  li { margin-bottom: 4px; }
+  /* Code */
+  code {
+    background: var(--brand-light);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.88em;
+    color: #c7254e;
+  }
+  pre {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 16px 20px;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    margin: 10px 0 16px;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    font-size: 0.9rem;
+  }
+  th {
+    background: var(--brand-blue);
+    color: #fff;
+    text-align: left;
+    padding: 10px 12px;
+  }
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid #e0e0e0;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: var(--brand-alt); }
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #fff;
+  }
+  .badge-blue   { background: var(--brand-blue); }
+  .badge-green  { background: var(--brand-green); }
+  .badge-orange { background: var(--brand-orange); }
+  .badge-red    { background: var(--brand-red); }
+  /* Callouts */
+  .callout {
+    border-left: 4px solid;
+    padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin: 14px 0;
+    font-size: 0.93rem;
+  }
+  .callout-info  { border-color: var(--brand-blue); background: #e8f0fe; }
+  .callout-warn  { border-color: var(--brand-orange); background: #fef7e0; }
+  .callout-error { border-color: var(--brand-red); background: #fce8e6; }
+  .callout-ok    { border-color: var(--brand-green); background: #e6f4ea; }
+  .callout strong { display: block; margin-bottom: 4px; }
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 16px 0 20px;
+  }
+  .flow-step {
+    background: var(--brand-blue);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .flow-arrow { font-size: 1.2rem; color: var(--brand-grey); }
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 20px;
+    color: var(--brand-grey);
+    font-size: 0.82rem;
+    border-top: 1px solid #e0e0e0;
+    margin-top: 40px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AI-Powered Multi-Document Chatbot (RAG System)</h1>
+  <p>SevenMentor &mdash; Project Guide for Students</p>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#folder-structure">Folder Structure</a>
+  <a href="#data-flow">Data Flow</a>
+  <a href="#setup">Setup</a>
+  <a href="#run">How to Run</a>
+  <a href="#files">Key Files</a>
+  <a href="#troubleshooting">Troubleshooting</a>
+</nav>
+
+<main>
+
+<!-- ────────────────────────────────────────── 1. OVERVIEW -->
+<section id="overview">
+  <h2>1. Project Overview</h2>
+  <p>
+    This project implements a <strong>Retrieval-Augmented Generation (RAG)</strong> chatbot.
+    Users upload documents (PDF, DOCX, TXT) through a web interface, and the system:
+  </p>
+  <ol>
+    <li><strong>Ingests</strong> files &rarr; validates, uploads to AWS S3.</li>
+    <li><strong>Preprocesses</strong> &rarr; extracts text, cleans it, splits into overlapping chunks.</li>
+    <li><strong>Embeds</strong> &rarr; converts chunks into 384-dim vectors using SentenceTransformers.</li>
+    <li><strong>Indexes</strong> &rarr; stores vectors in a FAISS index for fast similarity search.</li>
+    <li><strong>Retrieves</strong> the most relevant chunks for a user question.</li>
+    <li><strong>Generates</strong> an answer using an LLM (Groq / OpenAI / Gemini / Ollama / SageMaker).</li>
+  </ol>
+  <p>
+    The frontend is built with <strong>Streamlit</strong> and provides file upload, multi-turn chat, collapsible source citations, and an optional vector-visualization panel.
+  </p>
+</section>
+
+<!-- ────────────────────────────────────────── 2. ARCHITECTURE -->
+<section id="architecture">
+  <h2>2. Architecture Diagram</h2>
+  <pre><code>
+  User (Browser)
+      |
+      v
+  ┌──────────────────────────────────────┐
+  │  Streamlit Frontend  (07_frontend/)  │
+  └──────────────┬───────────────────────┘
+                 |
+                 v
+  ┌──────────────────────────────────────┐
+  │  RAG Pipeline  (06_pipeline/)        │
+  │                                      │
+  │  ingest()  ──>  query()              │
+  └──┬────────────────┬─────────────────┘
+     |                |
+     v                v
+  ┌─────────┐   ┌──────────┐   ┌───────────────┐
+  │ Ingest  │   │ Retrieve │   │  Generate     │
+  │ 01-03   │   │ 04_retr. │   │  05_gen.      │
+  │         │   │          │   │               │
+  │ Validate│   │ Embed Q  │   │ Prompt Build  │
+  │ Upload  │   │ FAISS    │   │ LLM Call      │
+  │ Extract │   │ Top-K    │   │ (External or  │
+  │ Clean   │   │          │   │  SageMaker)   │
+  │ Chunk   │   └──────────┘   └───────────────┘
+  │ Embed   │
+  │ Index   │
+  └─────────┘
+       |
+       v
+  ┌──────────────────────────┐
+  │  AWS S3  (raw/ + index/) │
+  └──────────────────────────┘
+  </code></pre>
+</section>
+
+<!-- ────────────────────────────────────────── 3. FOLDER STRUCTURE -->
+<section id="folder-structure">
+  <h2>3. Folder Structure</h2>
+  <table>
+    <tr><th>Directory / File</th><th>Purpose</th></tr>
+    <tr><td><code>config.py</code></td><td>Central configuration (reads <code>.env</code>). All modules import <code>cfg</code> from here.</td></tr>
+    <tr><td><code>pathsetup.py</code></td><td>Registers numbered-directory aliases so <code>from ingestion.file_validator import ...</code> works.</td></tr>
+    <tr><td><code>.env</code> / <code>.env.example</code></td><td>LLM provider and API keys. <code>.env</code> is gitignored.</td></tr>
+    <tr><td><code>01_ingestion/</code></td><td>File validation (<code>file_validator.py</code>) before extraction.</td></tr>
+    <tr><td><code>02_preprocessing/</code></td><td>Text extraction (<code>text_extractor.py</code>), cleaning (<code>cleaner.py</code>), and chunking (<code>chunker.py</code>).</td></tr>
+    <tr><td><code>03_embedding/</code></td><td>SentenceTransformer embedding (<code>embedder.py</code>) and FAISS vector store (<code>vector_store.py</code>).</td></tr>
+    <tr><td><code>04_retrieval/</code></td><td>Retriever that embeds the query and searches the FAISS index (<code>retriever.py</code>).</td></tr>
+    <tr><td><code>05_generation/</code></td><td>Prompt builder and external LLM client (Groq/OpenAI/Gemini/Ollama).</td></tr>
+    <tr><td><code>06_pipeline/</code></td><td>Orchestrator (<code>rag_pipeline.py</code>) — ties ingestion + retrieval + generation together.</td></tr>
+    <tr><td><code>07_frontend/</code></td><td>Streamlit web app (<code>app.py</code>).</td></tr>
+    <tr><td><code>EXTERNAL_LLM_SETUP.md</code></td><td>How to configure Groq, OpenAI, Gemini, Ollama, etc.</td></tr>
+    <tr><td><code>tests/</code></td><td>Pytest integration tests.</td></tr>
+    <tr><td><code>tmp/</code></td><td>Runtime directory for local FAISS indexes (auto-created, gitignored).</td></tr>
+    <tr><td><code>visualize_vectors.py</code></td><td>Standalone script to visualize chunk embeddings in 2D (PCA / t-SNE).</td></tr>
+    <tr><td><code>generate_pdf.py</code></td><td>Generates the Project Problem Statement PDF.</td></tr>
+  </table>
+</section>
+
+<!-- ────────────────────────────────────────── 4. DATA FLOW -->
+<section id="data-flow">
+  <h2>4. Data Flow &mdash; Step by Step</h2>
+
+  <h3>4.1 Ingestion Pipeline</h3>
+  <div class="flow">
+    <span class="flow-step">Upload File</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-step">Validate</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-step">Extract Text</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-step">Clean</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-step">Chunk (500 chars, 50 overlap)</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-step">Embed (384-dim)</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-step">FAISS Index</span>
+  </div>
+
+  <table>
+    <tr><th>Step</th><th>Module</th><th>What Happens</th></tr>
+    <tr>
+      <td>1. Validate</td>
+      <td><code>01_ingestion/file_validator.py</code></td>
+      <td>Checks extension (.pdf/.docx/.txt), non-empty, and &le; 20 MB.</td>
+    </tr>
+    <tr>
+      <td>2. Extract text</td>
+      <td><code>02_preprocessing/text_extractor.py</code></td>
+      <td>PDF &rarr; PyPDF2 page-by-page; DOCX &rarr; python-docx sections; TXT &rarr; decode.</td>
+    </tr>
+    <tr>
+      <td>3. Clean</td>
+      <td><code>02_preprocessing/cleaner.py</code></td>
+      <td>Strips null bytes, normalizes whitespace, removes control characters.</td>
+    </tr>
+    <tr>
+      <td>4. Chunk</td>
+      <td><code>02_preprocessing/chunker.py</code></td>
+      <td>RecursiveCharacterTextSplitter (LangChain) with separators: <code>["\n\n", "\n", ". ", " ", ""]</code>.</td>
+    </tr>
+    <tr>
+      <td>5. Embed</td>
+      <td><code>03_embedding/embedder.py</code></td>
+      <td>SentenceTransformers <code>all-MiniLM-L6-v2</code> &rarr; 384-dimension L2-normalized vectors.</td>
+    </tr>
+    <tr>
+      <td>6. Index</td>
+      <td><code>03_embedding/vector_store.py</code></td>
+      <td>Vectors added to FAISS <code>IndexFlatIP</code>; saved locally under <code>tmp/index/</code>.</td>
+    </tr>
+  </table>
+
+  <h3>4.2 Query Pipeline</h3>
+  <div class="flow">
+    <span class="flow-step">User Question</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-step">Embed Query</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-step">FAISS Search (top-5)</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-step">Build Prompt</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-step">LLM (Groq / OpenAI / Ollama / …)</span>
+    <span class="flow-arrow">&rarr;</span>
+    <span class="flow-step">Answer + Sources</span>
+  </div>
+
+  <table>
+    <tr><th>Step</th><th>Module</th><th>What Happens</th></tr>
+    <tr>
+      <td>1. Embed query</td>
+      <td><code>03_embedding/embedder.py</code></td>
+      <td>Same model encodes the question into a 384-dim vector.</td>
+    </tr>
+    <tr>
+      <td>2. Retrieve</td>
+      <td><code>04_retrieval/retriever.py</code></td>
+      <td>FAISS inner-product search returns the <em>top-k</em> most similar chunks with scores.</td>
+    </tr>
+    <tr>
+      <td>3. Build prompt</td>
+      <td><code>05_generation/prompt_builder.py</code></td>
+      <td>Formats retrieved chunks + question into a Llama 2 chat prompt (or chat messages for external APIs).</td>
+    </tr>
+    <tr>
+      <td>4. Generate</td>
+      <td><code>05_generation/external_llm.py</code></td>
+      <td>Sends prompt to the configured LLM provider and returns the generated answer.</td>
+    </tr>
+  </table>
+</section>
+
+<!-- ────────────────────────────────────────── 5. SETUP -->
+<section id="setup">
+  <h2>5. Setup Instructions</h2>
+
+  <h3>5.1 Prerequisites</h3>
+  <ul>
+    <li><strong>Python 3.10+</strong> (3.11 or 3.12 recommended)</li>
+    <li><strong>pip</strong> (comes with Python)</li>
+    <li><strong>Git</strong> (optional, for version control)</li>
+    <li><strong>Groq API key</strong> (free, recommended) &mdash; <em>or</em> another LLM provider</li>
+  </ul>
+
+  <h3>5.2 Install Dependencies</h3>
+  <pre><code># 1. Open a terminal in the rag_chatbot/ folder
+cd rag_chatbot
+
+# 2. (Recommended) Create a virtual environment
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS / Linux
+
+# 3. Install all packages
+pip install -r requirements.txt</code></pre>
+
+  <div class="callout callout-info">
+    <strong>Note:</strong> The first run will download the SentenceTransformers model (~90 MB). This only happens once.
+  </div>
+
+  <h3>5.3 Configure Environment Variables</h3>
+  <pre><code># Copy the template
+copy .env.example .env       # Windows
+# cp .env.example .env       # macOS / Linux
+
+# Open .env in a text editor and fill in your values</code></pre>
+
+  <h4>Core variables</h4>
+  <table>
+    <tr><th>Variable</th><th>Where to get it</th><th>Example</th></tr>
+    <tr>
+      <td><code>LLM_PROVIDER</code></td>
+      <td>Choose one: <code>groq</code>, <code>openai</code>, <code>gemini</code>, <code>ollama</code></td>
+      <td><code>groq</code></td>
+    </tr>
+    <tr>
+      <td><code>GROQ_API_KEY</code></td>
+      <td><a href="https://console.groq.com" target="_blank">console.groq.com</a> (free, no credit card)</td>
+      <td><code>gsk_...</code></td>
+    </tr>
+  </table>
+  <p>See <code>EXTERNAL_LLM_SETUP.md</code> for OpenAI, Gemini, Ollama, and other providers.</p>
+
+  <h3>5.4 LLM Provider Setup</h3>
+  <p>You only need <strong>one</strong> provider. Groq is recommended for students (free, fast).</p>
+
+  <table>
+    <tr><th>Provider</th><th><code>LLM_PROVIDER</code></th><th>API Key Variable</th><th>Get a Key</th></tr>
+    <tr>
+      <td><span class="badge badge-green">Groq</span> (recommended)</td>
+      <td><code>groq</code></td>
+      <td><code>GROQ_API_KEY</code></td>
+      <td><a href="https://console.groq.com" target="_blank">console.groq.com</a></td>
+    </tr>
+    <tr>
+      <td>OpenAI</td>
+      <td><code>openai</code></td>
+      <td><code>OPENAI_API_KEY</code></td>
+      <td><a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a></td>
+    </tr>
+    <tr>
+      <td>Google Gemini</td>
+      <td><code>gemini</code></td>
+      <td><code>GEMINI_API_KEY</code></td>
+      <td><a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a></td>
+    </tr>
+    <tr>
+      <td>Ollama (local)</td>
+      <td><code>ollama</code></td>
+      <td><em>none needed</em></td>
+      <td><a href="https://ollama.com" target="_blank">ollama.com</a> &mdash; then run <code>ollama pull llama3.2</code></td>
+    </tr>
+  </table>
+
+</section>
+
+<!-- ────────────────────────────────────────── 6. HOW TO RUN -->
+<section id="run">
+  <h2>6. How to Run</h2>
+
+  <h3>6.1 Start the Chatbot (Streamlit)</h3>
+  <pre><code># From the rag_chatbot/ folder
+streamlit run 07_frontend/app.py</code></pre>
+  <p>
+    This opens a browser tab at <code>http://localhost:8501</code>. Upload documents in the sidebar, click
+    <strong>Process Documents</strong>, then ask questions in the chat.
+  </p>
+
+  <h3>6.2 Run Tests</h3>
+  <pre><code># From the rag_chatbot/ folder
+python -m pytest tests/ -v</code></pre>
+  <p>No API keys required for tests (demo LLM mode).</p>
+
+  <h3>6.3 Visualize Vectors</h3>
+  <pre><code># List indexed sessions
+python visualize_vectors.py --list
+
+# Visualize a specific session (opens HTML plot)
+python visualize_vectors.py --session-id &lt;id&gt; --open
+
+# Default: first available session, PCA
+python visualize_vectors.py</code></pre>
+
+  <h3>6.4 Generate Problem Statement PDF</h3>
+  <pre><code>python generate_pdf.py</code></pre>
+
+  <h3>6.5 Quick Start Checklist</h3>
+  <ol>
+    <li>Copy <code>.env.example</code> to <code>.env</code> and set <code>LLM_PROVIDER</code> + API key (see <code>EXTERNAL_LLM_SETUP.md</code>).</li>
+    <li>Run <code>pip install -r requirements.txt</code>.</li>
+    <li>Run <code>streamlit run 07_frontend/app.py</code>.</li>
+    <li>Upload a document, process it, and ask a question.</li>
+  </ol>
+</section>
+
+<!-- ────────────────────────────────────────── 7. KEY FILES -->
+<section id="files">
+  <h2>7. Key Files Reference</h2>
+  <table>
+    <tr><th>File</th><th>Role</th></tr>
+    <tr><td><code>config.py</code></td><td>Centralized settings: LLM provider, chunking, embedding, etc.</td></tr>
+    <tr><td><code>pathsetup.py</code></td><td>Registers import aliases so <code>01_ingestion</code> can be imported as <code>ingestion</code>.</td></tr>
+    <tr><td><code>01_ingestion/file_validator.py</code></td><td>Validates file extension, size, and emptiness before upload.</td></tr>
+    <tr><td><code>02_preprocessing/text_extractor.py</code></td><td>Extracts raw text from PDF, DOCX, and TXT files.</td></tr>
+    <tr><td><code>02_preprocessing/cleaner.py</code></td><td>Normalizes whitespace, strips control characters and null bytes.</td></tr>
+    <tr><td><code>02_preprocessing/chunker.py</code></td><td>Splits text into overlapping chunks (500 chars, 50 overlap) using LangChain splitter.</td></tr>
+    <tr><td><code>03_embedding/embedder.py</code></td><td>Loads SentenceTransformer model and encodes text chunks into 384-dim vectors.</td></tr>
+    <tr><td><code>03_embedding/vector_store.py</code></td><td>FAISS index management: build, save, load (local disk), search, and vector export.</td></tr>
+    <tr><td><code>04_retrieval/retriever.py</code></td><td>Embeds the query vector and runs FAISS top-k search.</td></tr>
+    <tr><td><code>05_generation/prompt_builder.py</code></td><td>Constructs Llama 2 chat prompt or OpenAI-compatible chat messages from chunks + question.</td></tr>
+    <tr><td><code>05_generation/external_llm.py</code></td><td>Unified client for Groq, OpenAI, Gemini, Ollama, and OpenAI-compatible APIs.</td></tr>
+    <tr><td><code>06_pipeline/rag_pipeline.py</code></td><td>Orchestrator: <code>ingest()</code> runs the full ingestion pipeline; <code>query()</code> runs retrieval + generation.</td></tr>
+    <tr><td><code>07_frontend/app.py</code></td><td>Streamlit web application (sidebar upload + chat UI + vector viz).</td></tr>
+    <tr><td><code>tests/test_pipeline.py</code></td><td>Integration tests covering ingest, query, and prompt builder.</td></tr>
+    <tr><td><code>tests/test_ingestion.py</code></td><td>Unit tests for file validation.</td></tr>
+    <tr><td><code>tests/test_preprocessing.py</code></td><td>Unit tests for text extraction, cleaning, and chunking.</td></tr>
+    <tr><td><code>tests/test_embedding.py</code></td><td>Unit tests for the embedder and vector store.</td></tr>
+    <tr><td><code>visualize_vectors.py</code></td><td>CLI tool to produce interactive 2D scatter plots of chunk embeddings (PCA / t-SNE).</td></tr>
+    <tr><td><code>generate_pdf.py</code></td><td>Generates the formal Project Problem Statement PDF using ReportLab.</td></tr>
+    <tr><td><code>requirements.txt</code></td><td>All Python dependencies with minimum version pins.</td></tr>
+    <tr><td><code>.env.example</code></td><td>Template for environment variables (copy to <code>.env</code>).</td></tr>
+    <tr><td><code>.gitignore</code></td><td>Excludes <code>.env</code>, <code>__pycache__</code>, <code>tmp/</code>, etc. from version control.</td></tr>
+  </table>
+</section>
+
+<!-- ────────────────────────────────────────── 8. TROUBLESHOOTING -->
+<section id="troubleshooting">
+  <h2>8. Troubleshooting</h2>
+
+  <h3>Common Errors and Fixes</h3>
+
+  <!-- Error 1 -->
+  <div class="callout callout-error">
+    <strong>Error: <code>[Errno 22] Invalid argument</code> during ingestion (FAISS save/load)</strong>
+    This is a Windows-specific issue with FAISS file I/O when paths contain the <code>\\?\</code> long-path prefix.
+    <br><br>
+    <strong>Fix:</strong> Already handled in <code>vector_store.py</code> by the <code>_faiss_safe_path()</code> helper.
+    If you still see this, ensure you&rsquo;re using the latest version of the code.
+  </div>
+
+  <!-- Error 2 -->
+  <div class="callout callout-error">
+    <strong>Message: <code>No LLM configured</code> or placeholder answers only</strong>
+    <code>LLM_PROVIDER</code> is empty and <code>RAG_USE_DEMO_LLM</code> is not set to true.
+    <br><br>
+    <strong>Fix:</strong> Set <code>LLM_PROVIDER=groq</code> and <code>GROQ_API_KEY=...</code> in <code>.env</code>, or read <code>EXTERNAL_LLM_SETUP.md</code>.
+  </div>
+
+  <!-- Error 3 (was 5) -->
+  <div class="callout callout-error">
+    <strong>Error: <code>429 You exceeded your current quota</code> (Gemini)</strong>
+    Google Gemini free-tier quota is exhausted (or may be 0 in some regions).
+    <br><br>
+    <strong>Fix:</strong> Switch to Groq (free, no credit card): set <code>LLM_PROVIDER=groq</code> and <code>GROQ_API_KEY=...</code> in <code>.env</code>.
+  </div>
+
+  <!-- Error 4 -->
+  <div class="callout callout-error">
+    <strong>Error: <code>404 Model llama3-70b-8192 has been decommissioned</code> (Groq)</strong>
+    The default Groq model name is outdated.
+    <br><br>
+    <strong>Fix:</strong> Set <code>EXTERNAL_LLM_MODEL=llama-3.3-70b-versatile</code> in <code>.env</code> (already the default in the latest code).
+  </div>
+
+  <!-- Error 5 -->
+  <div class="callout callout-error">
+    <strong>Error: <code>Ollama is not running</code></strong>
+    The Ollama desktop application is not started, or <code>LLM_PROVIDER</code> is set to <code>ollama</code> when you intended a different provider.
+    <br><br>
+    <strong>Fix:</strong>
+    <ul>
+      <li>If using Ollama: install from <a href="https://ollama.com" target="_blank">ollama.com</a>, then run <code>ollama pull llama3.2</code> and start Ollama.</li>
+      <li>If not using Ollama: change <code>LLM_PROVIDER</code> in <code>.env</code> to your preferred provider (e.g., <code>groq</code>).</li>
+    </ul>
+  </div>
+
+  <!-- General tips -->
+  <h3>General Tips</h3>
+  <div class="callout callout-ok">
+    <strong>Always restart Streamlit after editing <code>.env</code></strong>
+    Environment variables are loaded once at app startup. Stop the app (<code>Ctrl+C</code>) and re-run
+    <code>streamlit run 07_frontend/app.py</code> to pick up changes.
+  </div>
+
+  <div class="callout callout-info">
+    <strong>Check your <code>.env</code> first</strong>
+    Most runtime errors are caused by missing or incorrect values in <code>.env</code>.
+    Compare your file with <code>.env.example</code> to ensure all required keys are present.
+  </div>
+</section>
+
+</main>
+
+<footer>
+  SevenMentor &mdash; AI &amp; Machine Learning Programme &mdash; RAG Chatbot Project Guide
+</footer>
+
+</body>
+</html>

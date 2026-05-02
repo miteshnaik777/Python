@@ -1,0 +1,4 @@
+PROJECT ALPHA SUMMARY
+Objective: To migrate the legacy database to the new encrypted server cluster. 
+Requirements: Requires simultaneous authorization from the Project Lead and the Lead Developer. 
+Completion Deadline: November 20, 2023.

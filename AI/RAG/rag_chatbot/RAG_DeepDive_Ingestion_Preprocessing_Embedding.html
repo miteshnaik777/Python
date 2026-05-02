@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Deep Dive: Ingestion, Preprocessing &amp; Embedding</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        /* Indigo/slate accent — distinct from Lesson 02 teal */
+        .gradient-bg { background: linear-gradient(135deg, #1e3a5f 0%, #4338ca 45%, #6366f1 100%); }
+        .card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .example-box  { background: linear-gradient(to right,#eef2ff,#e0e7ff); border-left:4px solid #6366f1; }
+        .formula-box  { background: linear-gradient(to right,#fef3c7,#fde68a); border-left:4px solid #f59e0b; }
+        .tip-box      { background: linear-gradient(to right,#d1fae5,#a7f3d0); border-left:4px solid #10b981; }
+        .warning-box  { background: linear-gradient(to right,#fee2e2,#fecaca); border-left:4px solid #ef4444; }
+        .advanced-box { background: linear-gradient(to right,#e0e7ff,#c7d2fe); border-left:4px solid #4f46e5; }
+        .outscope-box { background: linear-gradient(to right,#f1f5f9,#e2e8f0); border-left:4px solid #64748b; }
+        .mermaid { text-align: center; }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <!-- ========== Header ========== -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-6 py-8">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                    <h1 class="text-4xl font-bold mb-2">RAG Pipeline Deep Dive</h1>
+                    <p class="text-xl opacity-90">Ingestion, Preprocessing &amp; Embedding</p>
+                    <p class="text-sm opacity-80 mt-1">SevenMentor capstone · <code class="bg-white/10 px-1 rounded">rag_chatbot/</code> · Approx. reading time 25–35 minutes</p>
+                </div>
+                <div class="text-right text-sm opacity-90">
+                    <p>Reference document</p>
+                    <p>Local pipeline (no cloud required)</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-6 py-8 max-w-7xl">
+
+        <!-- ========== Learning objectives ========== -->
+        <section class="card bg-white rounded-xl shadow-lg p-8 mb-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center">
+                <span class="bg-indigo-100 text-indigo-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">&#127919;</span>
+                Learning objectives
+            </h2>
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="flex items-start space-x-3"><span class="text-indigo-500 text-xl">&#10003;</span><p class="text-gray-700">Trace <strong><code class="text-sm bg-gray-100 px-1 rounded">RAGPipeline.ingest()</code></strong> from uploaded bytes through validation, extraction, cleaning, chunking, embedding, and FAISS index persistence.</p></div>
+                <div class="flex items-start space-x-3"><span class="text-indigo-500 text-xl">&#10003;</span><p class="text-gray-700">Explain how <strong><code class="text-sm bg-gray-100 px-1 rounded">validate_file</code></strong> gates files using <code class="text-sm bg-gray-100 px-1 rounded">config.cfg</code>.</p></div>
+                <div class="flex items-start space-x-3"><span class="text-indigo-500 text-xl">&#10003;</span><p class="text-gray-700">Describe the shape of intermediate data: page dicts, chunk dicts, and embedding arrays.</p></div>
+                <div class="flex items-start space-x-3"><span class="text-indigo-500 text-xl">&#10003;</span><p class="text-gray-700">Understand <strong>SentenceTransformers</strong> encoding with L2 normalization and why <strong>FAISS IndexFlatIP</strong> matches cosine similarity.</p></div>
+                <div class="flex items-start space-x-3"><span class="text-indigo-500 text-xl">&#10003;</span><p class="text-gray-700">Locate on-disk artifacts: <code class="text-sm bg-gray-100 px-1 rounded">tmp/index/&lt;session_id&gt;/faiss.index</code> and <code class="text-sm bg-gray-100 px-1 rounded">metadata.json</code>.</p></div>
+            </div>
+        </section>
+
+        <!-- ========== Out of scope (one clear box) ========== -->
+        <section class="outscope-box rounded-lg p-5 mb-8">
+            <p class="font-semibold text-slate-800 mb-2">Scope of this document</p>
+            <p class="text-sm text-gray-700 leading-relaxed">
+                This deep dive covers the <strong>critical local path</strong> only. It does <strong>not</strong> document the Streamlit UI, retrieval (<code class="bg-white px-1 rounded text-xs">04_retrieval/</code>), or LLM generation (<code class="bg-white px-1 rounded text-xs">05_generation/</code>).
+            </p>
+        </section>
+
+        <!-- ========== Big picture: mermaid pipeline ========== -->
+        <!-- Maps to: rag_pipeline.py ingest → modules below -->
+        <section class="card bg-white rounded-xl shadow-lg p-8 mb-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">Big picture: data flow</h2>
+            <p class="text-gray-700 text-sm mb-6 leading-relaxed">
+                The orchestrator is <code class="bg-gray-100 px-1 rounded">RAGPipeline.ingest()</code> in <strong>06_pipeline/rag_pipeline.py</strong>. It loops over <code class="bg-gray-100 px-1 rounded">(filename, file_bytes)</code> tuples, accumulates chunks from every file, then embeds once and builds one FAISS index per <code class="bg-gray-100 px-1 rounded">session_id</code>.
+            </p>
+            <div class="mermaid bg-slate-50 rounded-lg p-6 mb-4 overflow-x-auto">
+flowchart TB
+    subgraph ingest["Per file (loop)"]
+        V["validate_file"]
+        E["extract_text"]
+        C["clean_pages"]
+        K["chunk_pages"]
+    end
+    V --> E --> C --> K
+    K --> A["extend all_chunks"]
+    A --> M["embed_chunks"]
+    M --> B["VectorStore.build"]
+    B --> S["save local disk"]
+            </div>
+            <p class="text-xs text-gray-600">
+                Optional cloud persistence exists in the codebase but is <strong>not</strong> required for the local pipeline: indexes are always written under <code class="bg-gray-100 px-1 rounded">rag_chatbot/tmp/index/</code>.
+            </p>
+        </section>
+
+        <!-- ========== Section A: Orchestration (rag_pipeline.py) ========== -->
+        <section class="card bg-white rounded-xl shadow-lg p-8 mb-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">A. Orchestration: <code class="text-2xl text-indigo-700">RAGPipeline.ingest</code></h2>
+            <p class="text-gray-700 text-sm mb-4 leading-relaxed">
+                <strong>Class:</strong> <code class="bg-gray-100 px-1 rounded">RAGPipeline</code> (<strong>06_pipeline/rag_pipeline.py</strong>). <strong>Method:</strong> <code class="bg-gray-100 px-1 rounded">ingest(files, session_id)</code> returns a dict with <code class="bg-gray-100 px-1 rounded">session_id</code>, <code class="bg-gray-100 px-1 rounded">files_processed</code>, <code class="bg-gray-100 px-1 rounded">total_chunks</code>, and <code class="bg-gray-100 px-1 rounded">skipped_files</code>.
+            </p>
+            <ul class="list-disc list-inside text-sm text-gray-700 space-y-2 mb-4">
+                <li><strong>Per-file exceptions:</strong> <code class="bg-gray-100 px-1 rounded">ValidationError</code> (from file validator), <code class="bg-gray-100 px-1 rounded">ValueError</code> (e.g. unsupported type in extractor), <code class="bg-gray-100 px-1 rounded">RuntimeError</code> (e.g. optional upload failure). Failed files are logged and listed in <code class="bg-gray-100 px-1 rounded">skipped_files</code>; others continue.</li>
+                <li><strong>Embedder reuse:</strong> <code class="bg-gray-100 px-1 rounded">self._embedder</code> is loaded lazily via <code class="bg-gray-100 px-1 rounded">get_embedder()</code> and reused for all chunks in the batch.</li>
+                <li><strong>Vector store:</strong> <code class="bg-gray-100 px-1 rounded">VectorStore(session_id=session_id)</code> receives the full chunk list and embedding matrix, then <code class="bg-gray-100 px-1 rounded">build()</code> and <code class="bg-gray-100 px-1 rounded">save()</code>.</li>
+            </ul>
+            <div class="example-box rounded-lg p-4 mb-4">
+                <p class="font-semibold text-indigo-900 mb-2">Core ingest loop (conceptual)</p>
+                <pre class="rounded-lg text-sm overflow-x-auto"><code class="language-python">for filename, content in files:
+    validate_file(filename, content)
+    pages = extract_text(file_bytes=content, filename=filename)
+    pages = clean_pages(pages)
+    chunks = chunk_pages(pages)
+    all_chunks.extend(chunks)
+# then: embed_chunks(all_chunks) → VectorStore.build → save</code></pre>
+            </div>
+            <div class="tip-box rounded-lg p-4">
+                <p class="text-sm text-gray-700"><strong>Tip:</strong> Read <code class="bg-white px-1 rounded">config.cfg</code> (<strong>config.py</strong>) for limits and model names used by chunking and embedding—single source of truth.</p>
+            </div>
+        </section>
+
+        <!-- ========== Section B: Ingestion (01_ingestion/file_validator.py) ========== -->
+        <section class="card bg-white rounded-xl shadow-lg p-8 mb-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">B. Ingestion: <code class="text-2xl text-indigo-700">file_validator.py</code></h2>
+            <p class="text-gray-700 text-sm mb-4 leading-relaxed">
+                Validation runs <strong>before</strong> any parsing. It ensures only allowed extensions, non-empty content, and size within limits—acting as a gate before <code class="bg-gray-100 px-1 rounded">extract_text</code>.
+            </p>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-3">B.1 API surface</h3>
+            <ul class="list-disc list-inside text-sm text-gray-700 space-y-2 mb-4">
+                <li><code class="bg-gray-100 px-1 rounded">ValidationError</code> — exception subclass raised when any check fails.</li>
+                <li><code class="bg-gray-100 px-1 rounded">validate_file(filename, content)</code> — runs three private checks; returns <code class="bg-gray-100 px-1 rounded">None</code> on success.</li>
+                <li><code class="bg-gray-100 px-1 rounded">_check_extension(filename)</code> — suffix must be in <code class="bg-gray-100 px-1 rounded">cfg.ALLOWED_EXTENSIONS</code>.</li>
+                <li><code class="bg-gray-100 px-1 rounded">_check_not_empty(filename, content)</code> — rejects zero-byte files.</li>
+                <li><code class="bg-gray-100 px-1 rounded">_check_size(filename, content)</code> — enforces <code class="bg-gray-100 px-1 rounded">cfg.MAX_FILE_SIZE_MB</code>.</li>
+                <li><code class="bg-gray-100 px-1 rounded">get_file_info(filename, content)</code> — returns a metadata dict (filename, extension, size) after you know the file is valid.</li>
+            </ul>
+
+            <div class="overflow-x-auto mb-6">
+                <table class="min-w-full text-sm border border-gray-200 rounded-lg">
+                    <thead class="bg-indigo-50">
+                        <tr>
+                            <th class="text-left p-3 border-b">Check</th>
+                            <th class="text-left p-3 border-b">Config key (<code class="text-xs">config.cfg</code>)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-700">
+                        <tr class="border-b"><td class="p-3">Extension whitelist</td><td class="p-3 font-mono text-xs">ALLOWED_EXTENSIONS</td></tr>
+                        <tr class="border-b"><td class="p-3">Maximum file size</td><td class="p-3 font-mono text-xs">MAX_FILE_SIZE_MB</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-3">B.2 Implementation excerpt</h3>
+            <pre class="rounded-lg text-sm overflow-x-auto mb-4"><code class="language-python">def validate_file(filename: str, content: bytes) -&gt; None:
+    _check_extension(filename)
+    _check_not_empty(filename, content)
+    _check_size(filename, content)
+
+
+def _check_extension(filename: str) -&gt; None:
+    ext = Path(filename).suffix.lower()
+    if ext not in cfg.ALLOWED_EXTENSIONS:
+        raise ValidationError(
+            f"Unsupported file type '{ext}'. "
+            f"Allowed: {', '.join(cfg.ALLOWED_EXTENSIONS)}"
+        )</code></pre>
+        </section>
+
+        <!-- ========== Section C: Preprocessing ========== -->
+        <!-- C1: text_extractor.py -->
+        <section class="card bg-white rounded-xl shadow-lg p-8 mb-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">C. Preprocessing</h2>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-3">C.1 Text extraction — <code class="text-lg">02_preprocessing/text_extractor.py</code></h3>
+            <p class="text-gray-700 text-sm mb-4 leading-relaxed">
+                <strong><code class="bg-gray-100 px-1 rounded">extract_text(file_bytes, filename)</code></strong> branches on extension and returns a <strong>list of dicts</strong>, each with at least <code class="bg-gray-100 px-1 rounded">text</code>, <code class="bg-gray-100 px-1 rounded">page</code>, <code class="bg-gray-100 px-1 rounded">source</code> (filename). This normalized shape feeds the cleaner and chunker.
+            </p>
+            <ul class="list-disc list-inside text-sm text-gray-700 space-y-2 mb-4">
+                <li><strong><code class="bg-gray-100 px-1 rounded">_extract_pdf</code></strong> — PyPDF2 <code class="bg-gray-100 px-1 rounded">PdfReader</code>; one dict per page with text (pages with no text are skipped).</li>
+                <li><strong><code class="bg-gray-100 px-1 rounded">_extract_docx</code></strong> — <code class="bg-gray-100 px-1 rounded">python-docx</code>; paragraphs grouped into sections; headings bump a section index used as <code class="bg-gray-100 px-1 rounded">page</code>.</li>
+                <li><strong><code class="bg-gray-100 px-1 rounded">_extract_txt</code></strong> — tries encodings <code class="bg-gray-100 px-1 rounded">utf-8</code>, <code class="bg-gray-100 px-1 rounded">latin-1</code>, <code class="bg-gray-100 px-1 rounded">cp1252</code>; fallback <code class="bg-gray-100 px-1 rounded">utf-8</code> with <code class="bg-gray-100 px-1 rounded">errors="replace"</code>.</li>
+            </ul>
+            <pre class="rounded-lg text-sm overflow-x-auto mb-6"><code class="language-python">def extract_text(file_bytes: bytes, filename: str) -&gt; List[Dict]:
+    ext = Path(filename).suffix.lower()
+    if ext == ".pdf":
+        return _extract_pdf(file_bytes, filename)
+    elif ext == ".docx":
+        return _extract_docx(file_bytes, filename)
+    elif ext == ".txt":
+        return _extract_txt(file_bytes, filename)
+    else:
+        raise ValueError(f"Unsupported file type: '{ext}'")</code></pre>
+
+            <!-- C2: cleaner.py -->
+            <h3 class="text-xl font-bold text-gray-800 mb-3">C.2 Cleaning — <code class="text-lg">02_preprocessing/cleaner.py</code></h3>
+            <p class="text-gray-700 text-sm mb-4 leading-relaxed">
+                <strong><code class="bg-gray-100 px-1 rounded">clean_text(text)</code></strong> normalizes one string: strips control chars (except tab/newline), Unicode NFC normalization, newline harmonization, collapses excessive whitespace, trims lines. <strong><code class="bg-gray-100 px-1 rounded">clean_pages(pages)</code></strong> applies <code class="bg-gray-100 px-1 rounded">clean_text</code> to each page dict&apos;s <code class="bg-gray-100 px-1 rounded">text</code> and <strong>drops</strong> entries that become empty.
+            </p>
+            <pre class="rounded-lg text-sm overflow-x-auto mb-6"><code class="language-python">def clean_pages(pages: List[Dict]) -&gt; List[Dict]:
+    cleaned = []
+    for page in pages:
+        text = clean_text(page.get("text", ""))
+        if text:
+            cleaned.append({**page, "text": text})
+    return cleaned</code></pre>
+
+            <!-- C3: chunker.py -->
+            <h3 class="text-xl font-bold text-gray-800 mb-3">C.3 Chunking — <code class="text-lg">02_preprocessing/chunker.py</code></h3>
+            <p class="text-gray-700 text-sm mb-4 leading-relaxed">
+                <strong><code class="bg-gray-100 px-1 rounded">chunk_pages(pages)</code></strong> uses LangChain&apos;s <strong><code class="bg-gray-100 px-1 rounded">RecursiveCharacterTextSplitter</code></strong> (<code class="bg-gray-100 px-1 rounded">langchain_text_splitters</code>, fallback <code class="bg-gray-100 px-1 rounded">langchain.text_splitter</code>). It splits on separators in order: <code class="bg-gray-100 px-1 rounded">["\n\n", "\n", ". ", " ", ""]</code>, preferring large natural breaks first. Chunk length uses character count via <code class="bg-gray-100 px-1 rounded">len</code>.
+            </p>
+            <div class="formula-box rounded-lg p-4 mb-4">
+                <p class="font-semibold text-yellow-900 mb-2">Parameters from config</p>
+                <p class="text-sm text-gray-700"><code class="bg-white px-1 rounded">chunk_size</code> = <code class="bg-white px-1 rounded">cfg.CHUNK_SIZE</code> (default 500), <code class="bg-white px-1 rounded">chunk_overlap</code> = <code class="bg-white px-1 rounded">cfg.CHUNK_OVERLAP</code> (default 50). Overlap reduces boundary cuts mid-thought.</p>
+            </div>
+            <p class="text-gray-700 text-sm mb-4">
+                Output chunk dicts include <code class="bg-gray-100 px-1 rounded">text</code>, <code class="bg-gray-100 px-1 rounded">source</code>, <code class="bg-gray-100 px-1 rounded">page</code>, and a running <code class="bg-gray-100 px-1 rounded">chunk_index</code> across the whole ingest batch. <strong><code class="bg-gray-100 px-1 rounded">chunk_text(text, source)</code></strong> wraps a single string as one synthetic page for convenience.
+            </p>
+            <pre class="rounded-lg text-sm overflow-x-auto"><code class="language-python">splitter = RecursiveCharacterTextSplitter(
+    chunk_size=cfg.CHUNK_SIZE,
+    chunk_overlap=cfg.CHUNK_OVERLAP,
+    length_function=len,
+    separators=["\n\n", "\n", ". ", " ", ""],
+)</code></pre>
+        </section>
+
+        <!-- ========== Section D: Embedding & vector_store ========== -->
+        <section class="card bg-white rounded-xl shadow-lg p-8 mb-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">D. Embedding &amp; vector index</h2>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-3">D.1 Embedder — <code class="text-lg">03_embedding/embedder.py</code></h3>
+            <ul class="list-disc list-inside text-sm text-gray-700 space-y-2 mb-4">
+                <li><strong><code class="bg-gray-100 px-1 rounded">get_embedder()</code></strong> — <code class="bg-gray-100 px-1 rounded">@lru_cache(maxsize=1)</code> loads <strong>SentenceTransformer</strong>(<code class="bg-gray-100 px-1 rounded">cfg.EMBEDDING_MODEL</code>, default <code class="bg-gray-100 px-1 rounded">all-MiniLM-L6-v2</code>) once; dimension <code class="bg-gray-100 px-1 rounded">cfg.EMBEDDING_DIM</code> (384).</li>
+                <li><strong><code class="bg-gray-100 px-1 rounded">embed_chunks(chunks, model=None)</code></strong> — collects <code class="bg-gray-100 px-1 rounded">chunk[&quot;text&quot;]</code>, batch-encodes with batch size 32, returns <code class="bg-gray-100 px-1 rounded">float32</code> array shape <code class="bg-gray-100 px-1 rounded">(N, EMBEDDING_DIM)</code>.</li>
+                <li><strong><code class="bg-gray-100 px-1 rounded">embed_query(query, model=None)</code></strong> — single query string to shape <code class="bg-gray-100 px-1 rounded">(1, EMBEDDING_DIM)</code>; used later by retrieval (outside this doc).</li>
+            </ul>
+            <div class="advanced-box rounded-lg p-5 mb-6">
+                <p class="font-semibold text-indigo-900 mb-2">Why <code class="bg-white px-1 rounded">normalize_embeddings=True</code></p>
+                <p class="text-sm text-gray-700">With L2-normalized vectors, <strong>inner product</strong> equals <strong>cosine similarity</strong>. The FAISS index uses inner product (<code class="bg-white px-1 rounded">IndexFlatIP</code>), so scores align with cosine without a separate cosine metric.</p>
+            </div>
+            <pre class="rounded-lg text-sm overflow-x-auto mb-8"><code class="language-python">embeddings = model.encode(
+    texts,
+    batch_size=32,
+    show_progress_bar=False,
+    convert_to_numpy=True,
+    normalize_embeddings=True,
+)</code></pre>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-3">D.2 VectorStore — <code class="text-lg">03_embedding/vector_store.py</code></h3>
+            <p class="text-gray-700 text-sm mb-4 leading-relaxed">
+                <strong>Class:</strong> <code class="bg-gray-100 px-1 rounded">VectorStore(session_id)</code>. Constructor creates <code class="bg-gray-100 px-1 rounded">cfg.LOCAL_INDEX_DIR / session_id</code> for local files.
+            </p>
+            <ul class="list-disc list-inside text-sm text-gray-700 space-y-2 mb-4">
+                <li><strong><code class="bg-gray-100 px-1 rounded">build(chunks, embeddings)</code></strong> — asserts <code class="bg-gray-100 px-1 rounded">len(chunks) == len(embeddings)</code>; builds <code class="bg-gray-100 px-1 rounded">faiss.IndexFlatIP(dim)</code>, <code class="bg-gray-100 px-1 rounded">add(embeddings)</code>, stores parallel <code class="bg-gray-100 px-1 rounded">metadata</code> list (chunk dicts).</li>
+                <li><strong><code class="bg-gray-100 px-1 rounded">_faiss_safe_path(path)</code></strong> — normalizes path strings for FAISS C++ I/O on Windows (avoids invalid-argument errors with some path formats).</li>
+                <li><strong><code class="bg-gray-100 px-1 rounded">_save_local()</code></strong> — writes <code class="bg-gray-100 px-1 rounded">faiss.index</code> via <code class="bg-gray-100 px-1 rounded">faiss.write_index</code> and <code class="bg-gray-100 px-1 rounded">metadata.json</code> as UTF-8 JSON.</li>
+                <li><strong><code class="bg-gray-100 px-1 rounded">_load_local()</code></strong> — reads both files back; returns <code class="bg-gray-100 px-1 rounded">False</code> if missing.</li>
+                <li><strong><code class="bg-gray-100 px-1 rounded">save()</code></strong> — writes <code class="bg-gray-100 px-1 rounded">faiss.index</code> and <code class="bg-gray-100 px-1 rounded">metadata.json</code> under the session directory.</li>
+                <li><strong><code class="bg-gray-100 px-1 rounded">load()</code></strong> — restores the index from those local files via <code class="bg-gray-100 px-1 rounded">_load_local()</code>.</li>
+            </ul>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-3">D.3 Search (preview)</h3>
+            <p class="text-gray-700 text-sm mb-4 leading-relaxed">
+                <strong><code class="bg-gray-100 px-1 rounded">search(query_vector, top_k)</code></strong> runs <code class="bg-gray-100 px-1 rounded">index.search(query_vector, k)</code>, maps row indices to metadata entries, and adds a <code class="bg-gray-100 px-1 rounded">score</code> field per hit. Default <code class="bg-gray-100 px-1 rounded">k</code> comes from <code class="bg-gray-100 px-1 rounded">cfg.TOP_K</code>. The full <strong>retrieval</strong> layer (<code class="bg-gray-100 px-1 rounded">Retriever</code> + query embedding) builds on this; see <code class="bg-gray-100 px-1 rounded">04_retrieval/retriever.py</code> when you extend this series.
+            </p>
+            <pre class="rounded-lg text-sm overflow-x-auto"><code class="language-python">self.index = faiss.IndexFlatIP(dim)
+self.index.add(embeddings)
+self.metadata = list(chunks)</code></pre>
+        </section>
+
+        <!-- ========== Section E: Quick reference tables ========== -->
+        <section class="card bg-white rounded-xl shadow-lg p-8 mb-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">E. Quick reference</h2>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-3">E.1 Module responsibilities</h3>
+            <div class="overflow-x-auto mb-8">
+                <table class="min-w-full text-sm border border-gray-200 rounded-lg">
+                    <thead class="bg-indigo-50">
+                        <tr>
+                            <th class="text-left p-3 border-b">Module / path</th>
+                            <th class="text-left p-3 border-b">Role</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-700">
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">06_pipeline/rag_pipeline.py</td><td class="p-3">Orchestrates ingest: validate → extract → clean → chunk → embed → index → save.</td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">config.py</td><td class="p-3">Central <code class="bg-gray-100 px-1 rounded">cfg</code>: limits, chunk params, embedding model, paths.</td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">01_ingestion/file_validator.py</td><td class="p-3">File gates: extension, empty, size.</td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">02_preprocessing/text_extractor.py</td><td class="p-3">PDF/DOCX/TXT → list of page dicts.</td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">02_preprocessing/cleaner.py</td><td class="p-3">Normalize text; drop empty pages.</td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">02_preprocessing/chunker.py</td><td class="p-3">Recursive splits → chunk dicts with metadata.</td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">03_embedding/embedder.py</td><td class="p-3">SentenceTransformer encode for chunks and queries.</td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">03_embedding/vector_store.py</td><td class="p-3">FAISS index + JSON metadata; local persist under <code class="bg-gray-100 px-1 rounded">tmp/index/</code>.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-3">E.2 Main functions &amp; methods (inputs / outputs)</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm border border-gray-200 rounded-lg">
+                    <thead class="bg-indigo-50">
+                        <tr>
+                            <th class="text-left p-3 border-b">Symbol</th>
+                            <th class="text-left p-3 border-b">Input → output</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-700">
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">validate_file</td><td class="p-3"><code class="bg-gray-100 px-1 rounded">(filename, bytes)</code> → None or raises <code class="bg-gray-100 px-1 rounded">ValidationError</code></td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">extract_text</td><td class="p-3"><code class="bg-gray-100 px-1 rounded">(file_bytes, filename)</code> → <code class="bg-gray-100 px-1 rounded">List[Dict]</code> page dicts</td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">clean_pages</td><td class="p-3">page dicts → cleaned page dicts (fewer if empty)</td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">chunk_pages</td><td class="p-3">page dicts → chunk dicts (+ chunk_index)</td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">embed_chunks</td><td class="p-3">chunks + optional model → <code class="bg-gray-100 px-1 rounded">ndarray (N, 384)</code></td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">VectorStore.build</td><td class="p-3">chunks + embeddings → populates in-memory index + metadata</td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">VectorStore._save_local</td><td class="p-3">writes <code class="bg-gray-100 px-1 rounded">faiss.index</code>, <code class="bg-gray-100 px-1 rounded">metadata.json</code></td></tr>
+                        <tr class="border-b"><td class="p-3 font-mono text-xs">VectorStore.search</td><td class="p-3"><code class="bg-gray-100 px-1 rounded">query_vector (1, dim)</code> → list of chunk dicts + score</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="warning-box rounded-lg p-5 mt-8">
+                <p class="font-semibold text-red-900 mb-2">First-run cost</p>
+                <p class="text-sm text-gray-700">The first call to <code class="bg-white px-1 rounded">get_embedder()</code> downloads <code class="bg-white px-1 rounded">all-MiniLM-L6-v2</code> (~90&nbsp;MB) into your Hugging Face cache. Subsequent runs reuse it.</p>
+            </div>
+        </section>
+
+        <!-- ========== Related paths (plain text) ========== -->
+        <section class="card bg-white rounded-xl shadow-lg p-8 mb-8">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Related code paths (not covered here)</h2>
+            <ul class="text-sm text-gray-700 font-mono space-y-1 list-disc list-inside">
+                <li>04_retrieval/retriever.py</li>
+                <li>05_generation/</li>
+                <li>07_frontend/app.py</li>
+                <li>EXTERNAL_LLM_SETUP.md (project root)</li>
+            </ul>
+        </section>
+
+    </main>
+
+    <footer class="bg-slate-800 text-white py-6 mt-8">
+        <div class="container mx-auto px-6 text-center">
+            <p class="text-gray-400">SevenMentor Institute · RAG capstone reference · <span class="text-slate-300">rag_chatbot</span></p>
+            <p class="text-gray-500 text-sm mt-1">Ingestion → preprocessing → embedding (local FAISS)</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });
+    </script>
+    <script>
+        window.addEventListener('load', function() {
+            if (typeof Prism !== 'undefined') Prism.highlightAll();
+        });
+    </script>
+</body>
+</html>
