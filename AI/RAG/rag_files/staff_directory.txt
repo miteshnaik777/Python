@@ -1,0 +1,5 @@
+PROJECT ALPHA - PERSONNEL DIRECTORY
+Project Lead: Dr. Aris Thorne (ID: 5521) - Access Level: Alpha
+Lead Developer: Elena Rodriguez (ID: 4409) - Access Level: Beta
+Logistics: Marcus Chen (ID: 3312) - Access Level: Gamma
+Note: All Level Alpha personnel are required to oversee system migrations scheduled for Q4.

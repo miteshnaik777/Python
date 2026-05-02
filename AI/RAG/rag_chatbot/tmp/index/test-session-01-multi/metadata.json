@@ -1,0 +1,14 @@
+[
+  {
+    "text": "SevenMentor Refund Policy\n\nCustomers may request a full refund within 30 days of purchase.\nTo initiate a refund, please contact support@sevenmentor.com with\nyour order number and reason for return.\n\nRefunds are processed within 5-7 business days after approval.\nNo refunds will be issued after 30 days from the date of purchase.",
+    "source": "policy.txt",
+    "page": 1,
+    "chunk_index": 0
+  },
+  {
+    "text": "This is a second document about HR policies and annual leave.",
+    "source": "hr.txt",
+    "page": 1,
+    "chunk_index": 0
+  }
+]
